@@ -38,6 +38,12 @@ algorithmic domain. Those I remember are:
 
 * Inclusion of some sample data and tests
 
+* Inclusion of a python interface to run the MultiCamSelfCal application
+
+* Improved the interface for maximally aligning a new calibration to existing
+  camera centers. See Align-Existing config option, and
+  the original_cam_centers.dat input file.
+
 The version history should make all of the changes clear.
 
 The original readme file is in MultiCamSelfCal/README.txt
@@ -111,3 +117,16 @@ pixels)::
   Repr. error in proj. space (no fact./fact./BA) is ...  0.714557 0.686345 0.620358
   2D reprojection error
   All points: mean  0.62 pixels, std is 0.61
+
+Python wrapper
+--------------
+
+John Stowers wrote an API to let this code be directly called from Python. To install:
+
+    cd python
+    python setup.py install
+
+To test:
+
+    cd python/tests
+    nosetests

@@ -9,7 +9,7 @@
 % $Id: gocal.m,v 2.7 2005/05/24 09:15:11 svoboda Exp $
 % $State: Exp $
 
-clear all
+clear variables globals
 
 v = version; Octave = v(1)<'5';  % Crude Octave test
 
@@ -20,6 +20,7 @@ addpath ('./CoreFunctions')
 addpath ('./OutputFunctions')
 addpath ('./BlueCLocal')
 addpath ('./LocalAlignments')
+addpath ('../CalTechCal')
 addpath ('../RansacM'); % ./Ransac for mex functions (it is significantly faster for noisy data)
 % get the configuration
 config = read_configuration();
@@ -262,7 +263,6 @@ while selfcal.iterate & selfcal.count < config.cal.GLOBAL_ITER_MAX,
 	% plot reconstructed cameras and points
 	drawscene(Xe,Ce,Re,3,'cloud','reconstructed points/camera setup');
 	drawscene(in.Xe,in.Ce,in.Re,4,'cloud','reconstructed points/camera setup only inliers are used',config.cal.cams2use);
-
 	% plot measured and reprojected 2D points
 	for i=1:CAMS
 	  in.xe		= in.Pe(((3*i)-2):(3*i),:)*in.Xe;
@@ -294,10 +294,20 @@ while selfcal.iterate & selfcal.count < config.cal.GLOBAL_ITER_MAX,
   %%%
   % SAVE camera matrices
   P = in.Pe;
+  X = in.Xe;
+  R = in.Re;
+  C = in.Ce;
   if Octave
-    save(config.files.Pmats,'P'); % all Octave data in ASCII format
+    % all Octave data in ASCII format
+    save(config.files.Pmats,'P');
+    save(config.files.Xe,'X'); 
+    save(config.files.Re,'R');
+    save(config.files.Ce,'C');
   else
     save(config.files.Pmats,'P','-ASCII');
+    save(config.files.Xe,'X','-ASCII');
+    save(config.files.Re,'R','-ASCII');
+    save(config.files.Ce,'C','-ASCII');
   end
 
   % save normal data
@@ -333,6 +343,11 @@ while selfcal.iterate & selfcal.count < config.cal.GLOBAL_ITER_MAX,
   if findstr('humdra',expname)
 	  [align] = humdra(in,config);
   end
+
+  if config.cal.ALIGN_EXISTING
+      align_existing_camera_centers(in,config);
+  end
+
   % planar alignement if knowledge available
   % [align,cam] = planarmove(in,cam,config);
   % try, [align,cam] = planarcams(in,cam,config,config.cal.planarcams); end
