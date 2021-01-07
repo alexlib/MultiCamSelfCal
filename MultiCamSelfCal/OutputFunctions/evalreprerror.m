@@ -7,7 +7,7 @@
 
 function cam = evalreprerror(cam,config)
 
-v = version; Octave = v(1)<'5';  % Crude Octave test
+Octave = exist('OCTAVE_VERSION', 'builtin') ~= 0;
 
 disp('2D reprojection error')
 disp(sprintf('All points: mean  %2.2f pixels, std is %2.2f',mean([cam.err2d]), std([cam.err2d])'));
@@ -27,7 +27,7 @@ end
 % sort the values and print them to the 2D graphs
 
 if ~Octave,
-figure(30), 
+figure(30),
 clf
 plot(config.cal.cams2use,[cam.mean2Derr],'bd'),
 hold on, grid on,
@@ -46,10 +46,10 @@ xlabel('Id of the camera')
 title('2D error: mean (blue), std (red)')
 ylabel('pixels')
 
-figure(31), 
+figure(31),
 eval(['print -depsc ', config.paths.data, 'reprerrors.eps'])
 
-figure(4), 
+figure(4),
 eval(['print -depsc ', config.paths.data, 'reconstructedsetup.eps'])
 end
 

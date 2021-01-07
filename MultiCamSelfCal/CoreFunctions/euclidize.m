@@ -74,7 +74,7 @@ for i = 1:n
   Temp = [Temp; u(1)*v(1) u(1)*v(2)+u(2)*v(1) u(3)*v(1)+u(1)*v(3) u(1)*v(4)+u(4)*v(1) u(2)*v(2) u(2)*v(3)+u(3)*v(2) u(2)*v(4)+u(4)*v(2) u(3)*v(3) u(4)*v(3)+u(3)*v(4) u(4)*v(4)];
 end
 % one additional equation only if needed
-if n<4 & ~config.cal.SQUARE_PIX
+if n<4 && ~config.cal.SQUARE_PIX
 	u = P(3,:);
 	Temp = [Temp; u(1)^2 2*u(1)*u(2) 2*u(1)*u(3) 2*u(1)*u(4) u(2)^2 2*u(2)*u(3) 2*u(2)*u(4) u(3)^2 2*u(3)*u(4) u(4)^2];
 	b = [zeros(size(Temp(1:end-1,1)));1];
@@ -131,13 +131,13 @@ if 1
 	  Pe(i*3-2:i*3,:) = -Pe(i*3-2:i*3,:);
 	end
 
-	% decompose the matrix by using rq decomposition  
+	% decompose the matrix by using rq decomposition
 	[K,R] = rq(Pe(i*3-2:i*3,1:3));
 	Cc	= -R'*inv(K)*Pe(i*3-2:i*3,4);% camera center
 	% Stephi calib params
 	Pst(i*3-2:i*3,:) = R'*inv(K);
 	Cst(i,:)		   = Cc';
-	% modify the Kalibaration matrix to get consistent 
+	% modify the Kalibaration matrix to get consistent
 	% euclidean motion Pe
 	K(1,3) = K(1,3)-config.cal.pp(i,1);
 	K(2,3) = K(2,3)-config.cal.pp(i,2);

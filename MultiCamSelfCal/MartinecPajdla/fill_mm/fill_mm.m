@@ -9,7 +9,7 @@
 %         standing for the unknown elements in all three coordinates
 %         size(M) = [3m, n]
 %    opt .. options with default values in ():
-%           .strategy(-1) ..   -1  choose the best of the following: 
+%           .strategy(-1) ..   -1  choose the best of the following:
 %                               0  sequence
 %                              -2  all strategies with the central image
 %                            1..m  the central image of the corresponding No.
@@ -47,36 +47,36 @@ if ~isfield(opt, 'verbose'),
 if ~isfield(opt.create_nullspace, 'verbose')
   opt.create_nullspace.verbose  = opt.verbose; end
 
-v = version; Octave = v(1)<'5';  % Crude Octave test 
-  
-if ~opt.verbose, 
+Octave = exist('OCTAVE_VERSION', 'builtin') ~= 0;
+
+if ~opt.verbose,
   fprintf('Repr. error in proj. space (no fact.');
   if Octave
     fflush(stdout);
   end
-  if ~opt.no_factorization, fprintf('/fact.'); 
+  if ~opt.no_factorization, fprintf('/fact.');
     if Octave
       fflush(stdout);
     end
   end
   if ~opt.no_BA
-    fprintf('/BA'); 
+    fprintf('/BA');
     if Octave
       fflush(stdout);
     end
-  end; 
-  fprintf(') is ... '); 
+  end;
+  fprintf(') is ... ');
   if Octave
     fflush(stdout);
   end
 end
-  
+
 nbeg = size(M,2);
 ptbeg = find(sum(~isnan(M(1:3:end,:))) >= 2); u2beg = setdiff(1:nbeg,ptbeg);
 M = M(:,ptbeg);
-if ~isempty(u2beg), 
+if ~isempty(u2beg),
   fprintf('Removed correspondences in < 2 images (%d):%s\n', length(u2beg),...
-      sprintf(' %d', u2beg(1:min(20, length(u2beg))))); 
+      sprintf(' %d', u2beg(1:min(20, length(u2beg)))));
   if Octave
     fflush(stdout);
   end
@@ -100,23 +100,23 @@ end
 
 added = 1; I = ~isnan(M(1:3:end,:)); info = []; iter = 0;
 while recoverable > 0 ... % not all parts of JIM are restored
-      &  added            % something was added during the last trial
+      &&  added            % something was added during the last trial
   if opt.verbose,
     disp(sprintf('%d (from %d) recovered columns...', length(cols), n)); end
-  
+
   added = 0; iter = iter + 1; if iter > 10, keyboard; end
-  
+
   [S, F, strengths] = compute_predictions(Omega, I); % for all stragegies
 
   % try the best strategy(s)
-  while (~added  &  max(F) > 0)  |  ...
+  while (~added  &&  max(F) > 0)  ||  ...
         sum(F==0) == length(F)  % when no data missing, only rescaling needed
 
     % choose the actually best strategy (sg)
     Omega_F = find(F==max(F)); if length(Omega_F) == 1, sg = Omega_F; else
       if opt.verbose, disp(sprintf('Omega_F:%s.', sprintf(' %d',Omega_F))); end
       ns = S(Omega_F);
-      Omega_S = Omega_F(find(ns==max(ns))); if length(Omega_S) >1 & opt.verbose
+      Omega_S = Omega_F(find(ns==max(ns))); if length(Omega_S) >1 && opt.verbose
         disp(sprintf('Omega_S:%s.', sprintf(' %d', Omega_S)));
         disp(['!!! Maybe some other criteria is needed to choose' ...
               ' the better candidate (now the 1st is taken)! !!!']); end
@@ -125,20 +125,20 @@ while recoverable > 0 ... % not all parts of JIM are restored
 
     [rows, cols, central, info] = set_rows_cols(Omega, sg, F, S, strengths, ...
                                                        I, info, opt);
-    F(sg) = -1; % "don't try this strategy anymore"    
+    F(sg) = -1; % "don't try this strategy anymore"
     if opt.verbose, disp(sprintf('Used images:%s.', sprintf(' %d', rows))); end
     [Mn,T] = normM(M);
     [Pn,X, lambda, u1,u2, info] = fill_mm_sub(Mn(k2i(rows),:), ...
                                               Mn(k2i(rows),cols), ...
                                              find(central==rows),opt,info);
-    if length(u1)==length(rows) & length(u2)==length(cols)
+    if length(u1)==length(rows) && length(u2)==length(cols)
       if opt.verbose, disp('Nothing recovered.'); end
     else
       if opt.verbose
         if ~isempty(u1), disp(sprintf('u1 = %s', num2str(u1))); end
-        if ~isempty(u2) & ~isempty(Pn),disp(sprintf('u2 = %s',num2str(u2)));end
+        if ~isempty(u2) && ~isempty(Pn),disp(sprintf('u2 = %s',num2str(u2)));end
       end
-      
+
       % say (un)recovered in indices of whole M not only M(k2i(rows),cols)
       r1 = rows(setdiff(1:length(rows),u1)); u1 = setdiff(1:m, r1);
       r2 = cols(setdiff(1:length(cols),u2)); u2 = setdiff(1:n, r2);
@@ -149,12 +149,12 @@ while recoverable > 0 ... % not all parts of JIM are restored
       if isempty(r1) | isempty(r2), fill = []; else,
       fill = find(isnan(M(3*r1, r2)) ... % some depths (lambda) could not
                                      ... % have been computed L2depths
-                  | (~isnan(M(3*r1,r2)) & isnan(lambda))); end
+                  | (~isnan(M(3*r1,r2)) && isnan(lambda))); end
       M_ = M(k2i(r1),r2); M_(k2i(fill)) = R(k2i(fill)); M(k2i(r1),r2) = M_;
 
       added = length(fill); I = ~isnan(M(1:3:end,:));
       recoverable = sum(sum(I(:,find(sum(I) >= 2))==0));
-      if opt.verbose, 
+      if opt.verbose,
         disp(sprintf('%d points added, %d recoverable points remain.', ...
                      added, recoverable)); end
 
@@ -169,11 +169,11 @@ while recoverable > 0 ... % not all parts of JIM are restored
 	  fflush(stdout);
 	end
       end
- 
+
     end
   end
-  
-  if ~added  &  sum(~I(:)) > 0 % impossible to recover anything
+
+  if ~added  &&  sum(~I(:)) > 0 % impossible to recover anything
     error('impossible to recover anything in fill_mm');
     P=[];X=[]; u1=1:m; u2=1:nbeg; info.opt = opt; return; end
 end
@@ -187,13 +187,13 @@ if ~opt.no_factorization
     if Octave
       fflush(stdout);
     end
-  tic; 
+  tic;
 end
 
   % depths estimated from info.Mdepths (which is approximated by R)
   Mdepths_un = normMback(info.Mdepths, T(r1,:,:));
   lambda(length(r1), length(r2)) = NaN;
-  for i = find(~isnan(M0(3*r1, r2)))', 
+  for i = find(~isnan(M0(3*r1, r2)))',
     lambda(i) = M0(k2i(i)) \ Mdepths_un(k2i(i)); end
   for i = 1:length(r1), B(k2i(i),:) = M(k2i(i),:).*([1;1;1]*lambda(i,:)); end
   fill = find(isnan(M0(3*r1, r2))); B(k2i(fill)) = R(k2i(fill));
@@ -226,10 +226,10 @@ for sg = 1:length(Omega)
    case 'cent'
     i = Omega{sg}.ind;
     strengths{i} = strength(i, I, 1);
-    F(sg)      = strengths{i}.strength(1);  % or 2 
+    F(sg)      = strengths{i}.strength(1);  % or 2
     S(sg)      = strengths{i}.num_scaled;
   end
-end  
+end
 
 
 function result = strength(central, I, general)
@@ -237,7 +237,7 @@ function result = strength(central, I, general)
 %strength Compute the central image strength of an image.
 %
 %  result = strength(central, I, general)
-%  
+%
 %  Parameters:
 %    `general' is set to logical true when generalized Jacobs' algorithm for
 %        unknown projective depths is supposed.
@@ -258,7 +258,7 @@ good_rows = [];
 	%display(central);
 % fundamental matrices
  for i = setdiff(1:m, central)
-   common = find(I(i,:) & I(central,:));
+   common = find(I(i,:) && I(central,:));
    if length(common) >= 8   % 7 for 7-points algorithm
      good_rows = [good_rows i];
 
@@ -272,10 +272,10 @@ good_rows = [];
 
 good_rows = union(good_rows,central);
 
-% Jacobs' algorithm needs at least 2 points in each column 
+% Jacobs' algorithm needs at least 2 points in each column
 % and its generalized form for unknown depths as well
   present       = sum(I);
-  good_cols     = find(present >= 2); 
+  good_cols     = find(present >= 2);
 
 Isub            = I(good_rows,good_cols);
 
@@ -289,7 +289,7 @@ result.strength = [ sum(Isub(:)==0) size(Isub,1)*size(Isub,2) ];
     scaled     = intersect(find(Isub(i,:)==1), scaled_cols);
     num_scaled = num_scaled + length(scaled);
   end
-  
+
 result.good_rows  = good_rows;
 result.good_cols  = good_cols;
 result.Isub       = Isub;
