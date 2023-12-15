@@ -5,30 +5,40 @@ on:
     branches: ["**"]
   pull_request:
     branches: ["**"]
+  schedule:
+    # At 23:25 on Thursday.
+    - cron: "25 23 * * 4"
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-
+  test-octave-only:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install octave
-        run: sudo apt install -y octave
+        run: sudo apt update && sudo apt install -y octave
       - name: Run test
         run: cd MultiCamSelfCal && octave gocal.m --config=../strawlab/test-data/DATA20100906_134124/no-global-iterations.cfg
 
   test-python:
-    runs-on: ubuntu-latest
-
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-latest]
+        python-version: [ '3.8', '3.x' ]
     steps:
-      - uses: actions/checkout@v2
-      - name: Install octave, python and pip
-        run: sudo apt install -y octave python3 python3-pip
-      - name: Install numpy
-        run: pip3 install numpy
+      - uses: actions/checkout@v3
+      - name: Install octave
+        run: sudo apt update && sudo apt install -y octave
+      - name: Setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
       - name: Install Python MCSC wrapper
-        run: cd python && pip3 install -e .
-      - name: Install Nose testing framework
-        run: pip3 install nose
+        run: pip install . -v
+      - name: Install pytest testing framework
+        run: pip install pytest
       - name: Test Python wrapper
-        run: cd python/test && nosetests
+        run: pytest

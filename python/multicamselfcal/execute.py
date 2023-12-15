@@ -7,51 +7,25 @@ import logging
 logging.basicConfig()
 import tempfile
 import shutil
+import importlib_resources # backport of importlib.resources that works on Python 3.8 and 3.9
+import pathlib
 
 import numpy as np
 
 from .formats import camera_calibration_yaml_to_radfile
 from .visualization import create_pcd_file_from_points
 
+# For the importlib.resources stuff to work, these must be
+# installed correctly by pip/etc.
+MCSC_DIRS = [
+    'MultiCamSelfCal',
+    'CommonCfgAndIO',
+    'RadialDistortions',
+    'CalTechCal',
+    'RansacM',
+    ]
+
 LOG = logging.getLogger('mcsc')
-
-class ThreadedCommand(threading.Thread):
-    def __init__(self, cmds,cwd,stdout,stderr,stdin=None,shell=False,executable=None):
-        threading.Thread.__init__(self)
-        if not shell:
-            cmds = shlex.split(cmds)
-        self._cmds = cmds
-        self._cwd = cwd
-        self._stdin = stdin
-        self._stdout = stdout
-        self._stderr = stderr
-        self._shell=shell
-        self._executable=executable
-        self._cb = None
-        self._cbargs = tuple()
-
-    def run(self):
-        kwargs = dict(              stdin=self._stdin,
-                                    stdout=self._stdout,
-                                    stderr=self._stderr,
-                                    shell=self._shell,
-                                    executable=self._executable,
-                                    cwd=self._cwd)
-
-        logging.getLogger('mcsc.cmd').debug("running cmd %r kwargs: %r" % (
-            self._cmds,kwargs))
-
-        self._cmd = subprocess.Popen(self._cmds, **kwargs)
-
-        self.pid = self._cmd.pid
-        self.results = self._cmd.communicate(self._stdin)
-        self.returncode = self._cmd.returncode
-        if self._cb:
-            self._cb(self, *self._cbargs)
-
-    def set_finished_cb(self, cb, *args):
-        self._cb = cb
-        self._cbargs = args
 
 _cfg_file = """[Files]
 Basename: {basename}
@@ -93,7 +67,7 @@ def save_ascii_matrix(arr,fd,isint=False):
     write a np.ndarray with 2 dims
     """
     assert arr.ndim==2
-    if arr.dtype==np.bool:
+    if arr.dtype==bool:
         arr = arr.astype( np.uint8 )
 
     close_file = False
@@ -109,6 +83,19 @@ def save_ascii_matrix(arr,fd,isint=False):
     if close_file:
         fd.close()
 
+def copy_traversable_tree(traversable, dest_path):
+    assert traversable.is_dir()
+    assert dest_path.is_dir()
+    for xap in traversable.iterdir():
+        xap_dest_path = dest_path / xap.name
+        if xap.is_file():
+            with importlib_resources.as_file(xap) as myfile:
+                shutil.copy(myfile, xap_dest_path)
+        else:
+            assert xap.is_dir()
+            xap_dest_path.mkdir()
+            copy_traversable_tree(xap, xap_dest_path )
+
 class _Calibrator:
     def __init__(self, out_dirname, **kwargs):
         if out_dirname:
@@ -118,8 +105,8 @@ class _Calibrator:
         else:
             out_dirname = tempfile.mkdtemp(prefix=self.__class__.__name__)
 
-        self.octave = kwargs.get('octave','/usr/bin/octave')
-        self.matlab = kwargs.get('matlab','/opt/matlab/R2011a/bin/matlab')
+        self.octave = kwargs.get('octave','octave')
+        self.matlab = kwargs.get('matlab','matlab')
         self.use_matlab = kwargs.get('use_matlab', False)
         self.out_dirname = out_dirname
 
@@ -130,15 +117,18 @@ class MultiCamSelfCal(_Calibrator):
 
     INPUT = ("camera_order.txt","IdMat.dat","points.dat","Res.dat","multicamselfcal.cfg", "original_cam_centers.dat")
 
-    def __init__(self, out_dirname, basename='basename', use_nth_frame=1, mcscdir='/opt/multicamselfcal/MultiCamSelfCal/', **kwargs):
+    def __init__(self, out_dirname, basename='basename', use_nth_frame=1, **kwargs):
         _Calibrator.__init__(self, out_dirname, **kwargs)
-        self.mcscdir = mcscdir
+
+        # Get MCSC source as datafiles resource.
+        # https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+
         self.basename = basename
         self.use_nth_frame = use_nth_frame
         self.align_existing = False
 
-        if not os.path.exists(os.path.join(self.mcscdir,'gocal.m')):
-            LOG.warn("could not find MultiCamSelfCal gocal.m in %s" % self.mcscdir)
+        # if not os.path.exists(os.path.join(self.mcscdir,'gocal.m')):
+        #     LOG.warning("could not find MultiCamSelfCal gocal.m in %s" % self.mcscdir)
 
     def _write_cam_ids(self, cam_ids):
         with open(os.path.join(self.out_dirname,'camera_order.txt'),'w') as f:
@@ -170,24 +160,12 @@ class MultiCamSelfCal(_Calibrator):
         LOG.debug("num_cameras_fill: %s" % num_cameras_fill)
         LOG.debug("wrote camera calibration directory: %s" % self.out_dirname)
 
-    def get_cmd_and_cwd(self, cfg):
-        if self.use_matlab:
-            cmds = '%s -nodesktop -nosplash -r "cd(\'%s\'); gocal_func(\'%s\'); exit"' % (
-                        self.matlab, self.mcscdir, cfg)
-            cwd = None
-        else:
-            cmds = '%s gocal.m --config=%s' % (
-                        self.octave, cfg)
-            cwd = self.mcscdir
-        return cmds,cwd
-
-    def execute(self, blocking=True, cb=None, dest=None, silent=True, copy_files=True):
+    def execute(self, dest=None, copy_files=True):
         """
         if dest is specified then all files are copied there unless copy is false. If dest is not
         specified then it is in a subdir of out_dirname called result
 
-        @returns: dest (or nothing if blocking is false). In that case cb is called when complete
-        and is passed the dest argument
+        @returns: dest.
         """
         if not dest:
             dest = os.path.join(self.out_dirname,'result')
@@ -205,10 +183,10 @@ class MultiCamSelfCal(_Calibrator):
                 if os.path.isfile(src):
                     shutil.copy(src, dest)
                 else:
-                    LOG.warn("Could not find %s" % src)
+                    LOG.warning("Could not find %s" % src)
             else:
                 if not os.path.isfile(src):
-                    LOG.warn("Could not find %s" % src)
+                    LOG.warning("Could not find %s" % src)
 
         if copy_files:
             for k,v in self.get_camera_names_map().items():
@@ -216,39 +194,30 @@ class MultiCamSelfCal(_Calibrator):
                 if os.path.isfile(src):
                     shutil.copy(src, dest)
                 else:
-                    LOG.warn("Could not find %s" % src)
+                    LOG.warning("Could not find %s" % src)
 
         cfg = os.path.abspath(os.path.join(dest, "multicamselfcal.cfg"))
 
-        cmds,cwd = self.get_cmd_and_cwd(cfg)
+        with tempfile.TemporaryDirectory() as mcscdir:
+            mcscdir = pathlib.Path(mcscdir)
+            for subdir in MCSC_DIRS:
+                copied_sub_dir = mcscdir/subdir
+                copied_sub_dir.mkdir()
+                traversable = importlib_resources.files(subdir)
+                copy_traversable_tree(traversable, copied_sub_dir)
 
-        bash_path = '/bin/bash'
-        if os.path.exists(bash_path) and not silent:
-            shell=True
-            # http://stackoverflow.com/questions/692000
-            cmds = cmds + ' > >(tee %s) 2> >(tee %s >&2)'%(stdout_fname,stderr_fname)
-            executable = bash_path
-            stdout = stderr = None
-        else:
-            shell=False
-            executable=None
-            if not silent:
-                LOG.warn('you requested not silent, but bash is required to support that.')
-            stdout = open(stdout_fname,'w')
-            stderr = open(stderr_fname,'w')
+            if self.use_matlab:
+                cmds = '%s -nodesktop -nosplash -r "cd(\'%s\'); gocal_func(\'%s\'); exit"' % (
+                            self.matlab, mcscdir, cfg)
+                cwd = None
+            else:
+                cmds = '%s gocal.m --config=%s' % (
+                            self.octave, cfg)
+                cwd = mcscdir / 'MultiCamSelfCal'
+            subprocess.check_call(cmds, cwd=cwd, shell=True)
+        return dest
 
-        cmd = ThreadedCommand(cmds,cwd=cwd,stdout=stdout,stderr=stderr,
-                              shell=shell,executable=executable)
-        cmd.set_finished_cb(cb,dest)
-        cmd.start()
-
-        if blocking:
-            cmd.join()
-            if cmd.returncode != 0:
-                raise RuntimeError('MCSC failed')
-            return dest
-
-    def create_from_cams(self, cam_ids=[], cam_resolutions={}, cam_points={}, cam_calibrations={}, num_cameras_fill=-1, **kwargs):
+    def create_from_cams(self, cam_ids=[], cam_resolutions={}, cam_points={}, cam_calibrations={}, num_cameras_fill=-1, initial_tolerance=10.0):
         #num_cameras_fill = -1 means use all cameras (= len(cam_ids))
 
         if not cam_ids:
@@ -260,7 +229,7 @@ class MultiCamSelfCal(_Calibrator):
             nvalid = np.count_nonzero(np.nan_to_num(np.array(cam_points[cam])))
             if nvalid == 0:
                 cams_to_remove.append(cam)
-                LOG.warn("removing cam %s - no points detected" % cam)
+                LOG.warning("removing cam %s - no points detected" % cam)
         map(cam_ids.remove, cams_to_remove)
 
         self._write_cam_ids(cam_ids)
@@ -316,7 +285,8 @@ class MultiCamSelfCal(_Calibrator):
                         undo_radial,
                         True,
                         num_cameras_fill,
-                        [])
+                        [],
+                        initial_tolerance)
         LOG.debug("dropped cams: %s" % ','.join(cams_to_remove))
 
     def create_calibration_directory(self, cam_ids, IdMat, points, Res, cam_calibrations=[], cam_centers=[], radial_distortion=0, square_pixels=1, num_cameras_fill=-1, initial_tolerance=10.0):
@@ -396,23 +366,25 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.DEBUG)
 
-    mydir = os.path.split(__file__)[0]
-    SRC_PATH = os.path.abspath(os.path.join(mydir,'..','..'))
+    # mydir = os.path.split(__file__)[0]
+    # SRC_PATH = os.path.abspath(os.path.join(mydir,'..','..'))
 
-    try:
-        data = os.path.abspath(os.path.expanduser(sys.argv[1]))
-    except IndexError:
-        data = os.path.abspath(
-                    os.path.join(SRC_PATH,
-                    'strawlab','test-data','DATA20100906_134124'))
+    data_dir = sys.argv[1]
+    data = os.path.abspath(os.path.expanduser(data_dir))
 
-    mcscdir = os.path.join(SRC_PATH,'MultiCamSelfCal')
-    kwargs = {}
-    if os.path.exists(mcscdir):
-        # assume running from source
-        kwargs['mcscdir']=mcscdir
+    # try:
+    #     data = os.path.abspath(os.path.expanduser(sys.argv[1]))
+    # except IndexError:
+    #     data = os.path.abspath(
+    #                 os.path.join(SRC_PATH,
+    #                 'strawlab','test-data','DATA20100906_134124'))
 
-    mcsc = MultiCamSelfCal(data, **kwargs)
-    caldir = mcsc.execute(silent=False)
+    # mcscdir = os.path.join(SRC_PATH,'MultiCamSelfCal')
+    # if os.path.exists(mcscdir):
+    #     # assume running from source
+    #     kwargs['mcscdir']=mcscdir
+
+    mcsc = MultiCamSelfCal(data)#, **kwargs)
+    caldir = mcsc.execute()
 
     print("result:",caldir)

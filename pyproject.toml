@@ -1,0 +1,44 @@
+[project]
+name = "multicamselfcal"
+version = "0.2.1"
+description = "wrapper for the Octave/Matlab multicamselfcal library"
+authors = [{ name = "John Stowers"}]
+maintainers = [{ name = "Andrew Straw", email = "strawman@astraw.com" }]
+readme = "README.md"
+requires-python = ">=3.8"
+urls.homepage = "https://github.com/strawlab/multicamselfcal"
+
+dependencies = [
+    "numpy",
+    "PyYAML",
+    "importlib-resources >= 6",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"multicamselfcal" = "python/multicamselfcal"}
+packages = [
+    "multicamselfcal",   # Python wrapper
+    "MultiCamSelfCal",   # Octave/Matlab MCSC code
+    "MultiCamSelfCal.BlueCLocal",
+    "MultiCamSelfCal.CoreFunctions",
+    "MultiCamSelfCal.FindingPoints",
+    "MultiCamSelfCal.LocalAlignments",
+    "MultiCamSelfCal.MartinecPajdla",
+    "MultiCamSelfCal.MartinecPajdla.fill_mm",
+    "MultiCamSelfCal.MartinecPajdla.fill_mm_test",
+    "MultiCamSelfCal.MartinecPajdla.utils",
+    "MultiCamSelfCal.OutputFunctions",
+    "MultiCamSelfCal.Ransac",
+    "CommonCfgAndIO",    # Octave/Matlab MCSC code
+    "RadialDistortions", # Octave/Matlab MCSC code
+    "CalTechCal",        # Octave/Matlab MCSC code
+    "RansacM",           # Octave/Matlab MCSC code
+    ]
+
+[tool.setuptools.package-data]
+# include all .m files as package data for python
+"*" = ["*.m"]
