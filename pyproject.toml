@@ -1,6 +1,6 @@
 [project]
 name = "multicamselfcal"
-version = "0.2.1"
+version = "0.3.2"
 description = "wrapper for the Octave/Matlab multicamselfcal library"
 authors = [{ name = "John Stowers"}]
 maintainers = [{ name = "Andrew Straw", email = "strawman@astraw.com" }]
@@ -19,9 +19,8 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-package-dir = {"multicamselfcal" = "python/multicamselfcal"}
 packages = [
-    "multicamselfcal",   # Python wrapper
+    "pymulticamselfcal",                           # Python wrapper
     "MultiCamSelfCal",   # Octave/Matlab MCSC code
     "MultiCamSelfCal.BlueCLocal",
     "MultiCamSelfCal.CoreFunctions",
